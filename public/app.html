@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>热梗雷达 - AI 热点追踪工具</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#f5f7fa;color:#333;min-height:100vh}
+.header{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:50px 20px 40px;text-align:center}
+.header h1{font-size:2.5em;margin-bottom:8px}
+.header p{opacity:.85;font-size:1.1em;max-width:500px;margin:0 auto}
+.container{max-width:900px;margin:0 auto;padding:20px 16px 60px}
+
+/* 操作区 */
+.action-bar{text-align:center;margin:-30px 0 30px;position:relative;z-index:1}
+.btn-start{
+  background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;
+  border:none;border-radius:16px;padding:16px 48px;font-size:1.15em;
+  font-weight:600;cursor:pointer;box-shadow:0 4px 20px rgba(102,126,234,.4);
+  transition:all .3s;
+}
+.btn-start:hover{transform:translateY(-2px);box-shadow:0 6px 25px rgba(102,126,234,.5)}
+.btn-start:disabled{opacity:.6;cursor:not-allowed;transform:none}
+
+/* 加载态 */
+.loading{display:none;text-align:center;padding:40px 0}
+.loading.active{display:block}
+.spinner{width:40px;height:40px;border:4px solid #e0e0e0;border-top-color:#667eea;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{color:#888;font-size:.95em}
+.loading-step{margin-top:8px;color:#667eea;font-weight:500}
+
+/* 统计卡 */
+.stats{display:none;gap:12px;flex-wrap:wrap;margin-bottom:24px}
+.stats.active{display:flex}
+.stat-card{background:#fff;border-radius:12px;padding:14px 18px;flex:1;min-width:120px;box-shadow:0 1px 4px rgba(0,0,0,.06);text-align:center}
+.stat-num{font-size:1.8em;font-weight:700;background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.stat-label{font-size:.82em;color:#888;margin-top:2px}
+
+/* AI 总结 */
+.ai-summary{display:none;background:linear-gradient(135deg,#e0c3fc,#8ec5fc);border-radius:14px;padding:20px 24px;margin-bottom:24px}
+.ai-summary.active{display:block}
+.ai-badge{display:inline-block;background:rgba(255,255,255,.7);border-radius:20px;padding:3px 12px;font-size:.82em;font-weight:600;margin-bottom:10px}
+.ai-summary p{font-size:.98em;line-height:1.7}
+
+/* 热梗卡片 */
+.trends{display:none}
+.trends.active{display:block}
+.trends-title{font-size:1.3em;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #667eea}
+.trend-card{background:#fff;border-radius:12px;padding:16px 18px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.05);transition:box-shadow .2s}
+.trend-card:hover{box-shadow:0 3px 12px rgba(0,0,0,.1)}
+.trend-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.trend-rank{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border-radius:8px;padding:2px 8px;font-size:.78em;font-weight:700;flex-shrink:0}
+.trend-title{font-weight:700;font-size:1.05em;flex:1}
+.trend-title a{color:#333;text-decoration:none;border-bottom:2px solid transparent;transition:border-color .2s}
+.trend-title a:hover{border-bottom-color:#667eea;color:#667eea}
+.trend-heat{font-size:1em;flex-shrink:0}
+.title-link{display:inline-block;border-radius:8px;padding:2px 8px;font-size:.72em;font-weight:500;text-decoration:none;margin-left:6px;transition:opacity .2s;vertical-align:middle}
+.title-link:hover{opacity:.75}
+.trend-platforms{margin-bottom:6px}
+.platform-tag{display:inline-block;border-radius:10px;padding:2px 9px;font-size:.76em;margin-right:5px;font-weight:500}
+.trend-desc{color:#555;font-size:.92em;margin-bottom:4px}
+.trend-why{color:#888;font-size:.85em;font-style:italic;margin-bottom:4px}
+.trend-usage{background:#f0f7ff;border-left:3px solid #667eea;padding:8px 12px;border-radius:0 8px 8px 0;font-size:.88em;color:#444;margin-top:8px}
+
+/* 热度值展示 */
+.heat-values{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.heat-chip{display:inline-flex;align-items:center;gap:4px;background:#f8f9fa;border-radius:8px;padding:3px 8px;font-size:.72em;color:#666}
+.heat-chip .platform-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
+/* 筛选说明 */
+.ranking-note{display:none;background:#fff;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:.85em;color:#666;line-height:1.6;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.ranking-note.active{display:block}
+.ranking-note strong{color:#333}
+
+/* 反馈区 */
+.feedback-section{margin-top:40px;border-top:2px solid #e0e0e0;padding-top:30px}
+.feedback-title{font-size:1.3em;font-weight:700;margin-bottom:20px}
+.feedback-form{background:#fff;border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.form-row{display:flex;gap:10px;margin-bottom:10px}
+.form-row input,.form-row select{flex:1;padding:10px 14px;border:1px solid #e0e0e0;border-radius:8px;font-size:.92em;outline:none;transition:border .2s}
+.form-row input:focus,.form-row select:focus{border-color:#667eea}
+.feedback-form textarea{width:100%;padding:10px 14px;border:1px solid #e0e0e0;border-radius:8px;font-size:.92em;outline:none;resize:vertical;min-height:80px;font-family:inherit;transition:border .2s}
+.feedback-form textarea:focus{border-color:#667eea}
+.form-actions{display:flex;justify-content:flex-end;margin-top:10px}
+.btn-submit{background:#667eea;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:.92em;font-weight:600;cursor:pointer;transition:opacity .2s}
+.btn-submit:hover{opacity:.85}
+.btn-submit:disabled{opacity:.5;cursor:not-allowed}
+.feedback-list{display:flex;flex-direction:column;gap:12px}
+.feedback-item{background:#fff;border-radius:12px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.fb-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.fb-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.8em;font-weight:600;flex-shrink:0}
+.fb-meta{flex:1}
+.fb-name{font-weight:600;font-size:.92em}
+.fb-time{font-size:.78em;color:#aaa}
+.fb-category{font-size:.72em;padding:2px 8px;border-radius:10px;font-weight:500}
+.fb-category.建议{background:#e8f5e9;color:#2e7d32}
+.fb-category.Bug{background:#fce4ec;color:#c62828}
+.fb-category.功能{background:#e3f2fd;color:#1565c0}
+.fb-content{font-size:.95em;line-height:1.6;margin-bottom:8px}
+.fb-replies{margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0}
+.fb-reply{display:flex;gap:8px;margin-bottom:8px}
+.fb-reply-avatar{width:24px;height:24px;border-radius:50%;background:#e0e0e0;color:#666;display:flex;align-items:center;justify-content:center;font-size:.65em;font-weight:600;flex-shrink:0}
+.fb-reply-avatar.admin{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+.fb-reply-body{flex:1}
+.fb-reply-name{font-weight:600;font-size:.82em}
+.fb-reply-name .admin-tag{background:#667eea;color:#fff;font-size:.7em;padding:1px 6px;border-radius:6px;margin-left:4px;font-weight:400}
+.fb-reply-text{font-size:.88em;color:#555;line-height:1.5}
+.fb-reply-time{font-size:.72em;color:#bbb}
+.fb-actions{display:flex;gap:8px;margin-top:8px}
+.btn-like{
+  background:none;border:1px solid #e0e0e0;border-radius:20px;
+  padding:4px 12px;font-size:.82em;cursor:pointer;
+  display:flex;align-items:center;gap:4px;transition:all .2s;color:#888;
+}
+.btn-like:hover{border-color:#667eea;color:#667eea}
+.btn-like.liked{border-color:#667eea;background:#667eea10;color:#667eea;font-weight:600}
+.fb-reply-form{display:flex;gap:8px;margin-top:8px}
+.fb-reply-form input{flex:1;padding:8px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:.85em;outline:none}
+.fb-reply-form input:focus{border-color:#667eea}
+.btn-reply{background:#f0f0f0;border:none;border-radius:8px;padding:8px 16px;font-size:.85em;cursor:pointer;font-weight:500;transition:background .2s}
+.btn-reply:hover{background:#e0e0e0}
+
+.footer{text-align:center;padding:20px;color:#aaa;font-size:.82em}
+
+@media(max-width:600px){
+  .header h1{font-size:1.8em}
+  .stat-card{min-width:calc(50% - 8px)}
+  .form-row{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📡 热梗雷达</h1>
+  <p>一键抓取微博、B站、百度、抖音热搜，AI 筛选最有价值的 30 个热梗</p>
+</div>
+
+<div class="container">
+  <div class="action-bar">
+    <button class="btn-start" id="btnStart" onclick="startFetch()">🔍 开始抓取</button>
+  </div>
+
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">正在抓取各平台热搜...</div>
+    <div class="loading-step" id="loadingStep"></div>
+  </div>
+
+  <div class="stats" id="stats">
+    <div class="stat-card"><div class="stat-num" id="statRaw">-</div><div class="stat-label">原始热点</div></div>
+    <div class="stat-card"><div class="stat-num" id="statMerged">-</div><div class="stat-label">去重合并</div></div>
+    <div class="stat-card"><div class="stat-num" id="statFiltered">-</div><div class="stat-label">AI 精选</div></div>
+    <div class="stat-card"><div class="stat-num" id="statTime">-</div><div class="stat-label">耗时</div></div>
+  </div>
+
+  <div class="ai-summary" id="aiSummary">
+    <div class="ai-badge">🤖 AI 分析</div>
+    <p id="aiSummaryText"></p>
+  </div>
+
+  <div class="ranking-note" id="rankingNote">
+    <strong>📊 选榜依据：</strong>综合跨平台出现次数、平台内排名热度、话题讨论价值等维度，由 AI 从全量热搜中筛选出最具传播力和创作价值的 30 个热梗。每条右下角显示该话题在各平台的原始热度值。
+  </div>
+
+  <div class="trends" id="trends">
+    <div class="trends-title" id="trendsTitle">🔥 近期热梗 Top 30</div>
+    <div id="trendsList"></div>
+  </div>
+
+  <!-- 反馈区 -->
+  <div class="feedback-section" id="feedbackSection">
+    <div class="feedback-title">💬 意见反馈</div>
+    <div class="feedback-form">
+      <div class="form-row">
+        <input type="text" id="fbName" placeholder="昵称（选填）" maxlength="20">
+        <select id="fbCategory">
+          <option value="建议">💡 建议</option>
+          <option value="功能">⚡ 功能需求</option>
+          <option value="Bug">🐛 Bug 反馈</option>
+        </select>
+      </div>
+      <textarea id="fbContent" placeholder="说说你的想法，所有人都能看到..." maxlength="500"></textarea>
+      <div class="form-actions">
+        <button class="btn-submit" onclick="submitFeedback()">提交</button>
+      </div>
+    </div>
+    <div id="debugInfo" style="background:#fff3cd;border-radius:8px;padding:8px 12px;font-size:.78em;color:#856404;margin-bottom:12px;min-height:20px;word-break:break-all"></div>
+    <div class="feedback-list" id="feedbackList"></div>
+  </div>
+</div>
+
+<div class="footer">Powered by 热梗雷达 · 数据来源：微博/B站/百度/抖音</div>
+
+<script>
+const PC = {weibo:"#ff4d4f",bilibili:"#00a1d6",baidu:"#306cff",douyin:"#fe2c55",xiaohongshu:"#ff2442"};
+const PN = {weibo:"微博",bilibili:"B站",baidu:"百度",douyin:"抖音",xiaohongshu:"小红书"};
+
+async function startFetch() {
+  const btn = document.getElementById("btnStart");
+  const loading = document.getElementById("loading");
+  const loadingStep = document.getElementById("loadingStep");
+  btn.disabled = true; btn.textContent = "⏳ 抓取中...";
+  loading.classList.add("active");
+  ["stats","aiSummary","trends","rankingNote"].forEach(id => document.getElementById(id).classList.remove("active"));
+
+  const steps = ["抓取微博...","抓取B站...","抓取百度...","抓取抖音...","跨平台去重...","AI 分析中...","生成报告..."];
+  let si = 0;
+  const timer = setInterval(() => { loadingStep.textContent = steps[Math.min(si, steps.length-1)]; si++; }, 3000);
+
+  try {
+    const resp = await fetch("/api/run", { method: "POST" });
+    const data = await resp.json();
+    clearInterval(timer); loading.classList.remove("active");
+
+    if (data.error) { alert("出错了: " + data.error); btn.disabled = false; btn.textContent = "🔍 重新抓取"; return; }
+
+    // 统计
+    document.getElementById("statRaw").textContent = data.stats.raw;
+    document.getElementById("statMerged").textContent = data.stats.merged;
+    document.getElementById("statFiltered").textContent = data.stats.filtered;
+    document.getElementById("statTime").textContent = data.elapsed;
+    document.getElementById("stats").classList.add("active");
+
+    // AI 总结
+    if (data.summary) { document.getElementById("aiSummaryText").textContent = data.summary; document.getElementById("aiSummary").classList.add("active"); }
+
+    // 选榜依据
+    document.getElementById("rankingNote").classList.add("active");
+
+    // 热梗列表
+    const list = document.getElementById("trendsList"); list.innerHTML = "";
+    data.trends.forEach((t) => {
+      const tags = (t.platforms||[]).map(p => `<span class="platform-tag" style="background:${PC[p]||"#666"}15;color:${PC[p]||"#666"}">${PN[p]||p}</span>`).join("");
+      const links = (t.urls||[]).map(u => `<a href="${u.url}" target="_blank" class="title-link" style="background:${PC[u.platform]||"#666"}12;color:${PC[u.platform]||"#666"}">↗ ${PN[u.platform]||u.platform}</a>`).join("");
+      const titleHtml = (t.urls&&t.urls.length) ? `<a href="${t.urls[0].url}" target="_blank">${esc(t.title)}</a>${links}` : esc(t.title);
+
+      // 热度值 chips（格式化：上万用 W 表示）
+      const hv = t.heat_values || {};
+      const heatChips = Object.entries(hv).map(([k,v]) => {
+        const num = parseInt(String(v).replace(/[^0-9]/g, ""));
+        const display = isNaN(num) ? v : formatHeat(num);
+        return `<span class="heat-chip"><span class="platform-dot" style="background:${PC[k]||"#999"}"></span>${PN[k]||k}: ${display}</span>`;
+      }).join("");
+
+      list.innerHTML += `
+        <div class="trend-card">
+          <div class="trend-header">
+            <span class="trend-rank">#${t.rank||""}</span>
+            <div class="trend-title">${titleHtml}</div>
+            <span class="trend-heat">${t.heat_level||""}</span>
+          </div>
+          <div class="trend-platforms">${tags}</div>
+          <div class="trend-desc">${esc(t.description||"")}</div>
+          ${t.why_hot?`<div class="trend-why">📢 ${esc(t.why_hot)}</div>`:""}
+          ${t.usage?`<div class="trend-usage">💡 <strong>创作灵感：</strong>${esc(t.usage)}</div>`:""}
+          ${heatChips?`<div class="heat-values">${heatChips}</div>`:""}
+        </div>`;
+    });
+    document.getElementById("trendsTitle").textContent = `🔥 近期热梗 Top ${data.trends.length}`;
+    document.getElementById("trends").classList.add("active");
+
+    // 刷新反馈列表
+    loadFeedback();
+
+    btn.textContent = "🔄 再抓一次";
+  } catch(e) {
+    clearInterval(timer); loading.classList.remove("active");
+    alert("请求失败: " + e.message);
+  }
+  btn.disabled = false;
+}
+
+// ═══ 反馈系统 ═══
+async function loadFeedback() {
+  try {
+    const resp = await fetch("/api/feedback?_t=" + Date.now());
+    const data = await resp.json();
+    renderFeedback(data.feedback || []);
+  } catch (e) {
+    console.error("加载反馈失败:", e);
+  }
+}
+
+function renderFeedback(items) {
+  const list = document.getElementById("feedbackList");
+  if (!items.length) { list.innerHTML = '<div style="text-align:center;color:#bbb;padding:20px">还没有反馈，来做第一个吧 ✨</div>'; return; }
+  const fp = getFingerprint();
+  list.innerHTML = items.map(fb => {
+    const initial = fb.username.slice(0,1);
+    const liked = (fb.likedBy||[]).includes(fp);
+    const replies = (fb.replies||[]).map(r => `
+      <div class="fb-reply">
+        <div class="fb-reply-avatar ${r.isAdmin?'admin':''}">${r.isAdmin?'管':r.username.slice(0,1)}</div>
+        <div class="fb-reply-body">
+          <div class="fb-reply-name">${esc(r.username)}${r.isAdmin?'<span class="admin-tag">官方</span>':''}</div>
+          <div class="fb-reply-text">${esc(r.content)}</div>
+          <div class="fb-reply-time">${timeAgo(r.createdAt || r.created_at)}</div>
+        </div>
+      </div>
+    `).join("");
+    return `
+      <div class="feedback-item" id="fb-${fb.id}">
+        <div class="fb-header">
+          <div class="fb-avatar">${initial}</div>
+          <div class="fb-meta">
+            <div class="fb-name">${esc(fb.username)}</div>
+            <div class="fb-time">${timeAgo(fb.created_at || fb.createdAt)}</div>
+          </div>
+          <span class="fb-category ${fb.category}">${fb.category}</span>
+        </div>
+        <div class="fb-content">${esc(fb.content)}</div>
+        <div class="fb-actions">
+          <button class="btn-like ${liked?'liked':''}" onclick="toggleLike('${fb.id}')">
+            ${liked?'👍':'👍'} <span>${fb.likes||0}</span>
+          </button>
+        </div>
+        ${replies?`<div class="fb-replies">${replies}</div>`:""}
+        <div class="fb-reply-form">
+          <input type="text" id="reply-${fb.id}" placeholder="回复..." onkeydown="if(event.key==='Enter')submitReply('${fb.id}')">
+          <button class="btn-reply" onclick="submitReply('${fb.id}')">回复</button>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+async function toggleLike(fbId) {
+  try {
+    const resp = await fetch("/api/feedback/like", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ id: fbId, fingerprint: getFingerprint() })
+    });
+    const data = await resp.json();
+    if (data.success) loadFeedback();
+  } catch {}
+}
+
+function getFingerprint() {
+  let fp = localStorage.getItem("fp");
+  if (!fp) { fp = "u" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); localStorage.setItem("fp", fp); }
+  return fp;
+}
+
+async function submitFeedback() {
+  const name = document.getElementById("fbName").value.trim();
+  const content = document.getElementById("fbContent").value.trim();
+  const category = document.getElementById("fbCategory").value;
+  if (!content) { alert("请输入反馈内容"); return; }
+  const btn = document.querySelector(".btn-submit");
+  btn.disabled = true; btn.textContent = "提交中...";
+
+  // 重试机制（最多3次）
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const resp = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: name || "匿名用户", content, category }),
+      });
+      const data = await resp.json();
+      if (data.error) {
+        if (attempt < 3) { await new Promise(r => setTimeout(r, 1000)); continue; }
+        alert("提交失败: " + data.error);
+        btn.disabled = false; btn.textContent = "提交";
+        return;
+      }
+      document.getElementById("fbContent").value = "";
+      if (name) localStorage.setItem("fb_name", name);
+      await new Promise(r => setTimeout(r, 800));
+      await loadFeedback();
+      btn.textContent = "✅ 已提交";
+      setTimeout(() => { btn.textContent = "提交"; btn.disabled = false; }, 2000);
+      return;
+    } catch (e) {
+      if (attempt < 3) { await new Promise(r => setTimeout(r, 1000)); continue; }
+      btn.disabled = false; btn.textContent = "提交";
+      alert("提交失败，请重试: " + e.message);
+    }
+  }
+}
+
+async function submitReply(fbId) {
+  const input = document.getElementById("reply-" + fbId);
+  const content = input.value.trim();
+  if (!content) return;
+  const name = localStorage.getItem("fb_name") || document.getElementById("fbName").value.trim() || "匿名";
+  try {
+    await fetch("/api/feedback/reply", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({id:fbId, username:name, content}) });
+    input.value = "";
+    loadFeedback();
+  } catch(e) { alert("回复失败: " + e.message); }
+}
+
+function timeAgo(val) {
+  // 从各种可能的字段名中取时间
+  let raw = val;
+  if (!raw && arguments.length > 0) raw = null;
+  if (!raw) return "刚刚";
+  // 如果传入的是对象，尝试找时间字段
+  if (typeof raw === "object" && raw !== null) {
+    raw = raw.created_at || raw.createdAt || raw.created || raw.time || raw.date || null;
+  }
+  if (!raw) return "刚刚";
+  let ts;
+  try { ts = new Date(String(raw)).getTime(); } catch { return "刚刚"; }
+  if (!ts || isNaN(ts)) return "刚刚";
+  const diff = (Date.now() - ts) / 1000;
+  if (diff < 0 || isNaN(diff)) return "刚刚";
+  if (diff < 60) return "刚刚";
+  if (diff < 3600) return Math.floor(diff/60) + "分钟前";
+  if (diff < 86400) return Math.floor(diff/3600) + "小时前";
+  return Math.floor(diff/86400) + "天前";
+}
+
+function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+function formatHeat(n) {
+  if (n >= 10000) return (n / 10000).toFixed(n >= 100000 ? 0 : 1) + "W+";
+  if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+  return String(n);
+}
+
+window.onload = () => {
+  const n = localStorage.getItem("fb_name");
+  if (n) document.getElementById("fbName").value = n;
+  // 测试 timeAgo 是否正常
+  const testDiv = document.getElementById("debugInfo");
+  if (testDiv) {
+    const t1 = timeAgo("2026-06-01T09:01:55.077146+00:00");
+    const t2 = timeAgo(new Date().toISOString());
+    testDiv.textContent = "timeAgo测试: ISO=" + t1 + " | 现在=" + t2;
+  }
+  loadFeedback();
+};
+</script>
+</body>
+</html>
