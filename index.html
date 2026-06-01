@@ -301,7 +301,7 @@ function renderFeedback(items) {
         <div class="fb-reply-body">
           <div class="fb-reply-name">${esc(r.username)}${r.isAdmin?'<span class="admin-tag">官方</span>':''}</div>
           <div class="fb-reply-text">${esc(r.content)}</div>
-          <div class="fb-reply-time">${timeAgo(r.createdAt)}</div>
+          <div class="fb-reply-time">${timeAgo(r.createdAt || r.created_at)}</div>
         </div>
       </div>
     `).join("");
@@ -311,7 +311,7 @@ function renderFeedback(items) {
           <div class="fb-avatar">${initial}</div>
           <div class="fb-meta">
             <div class="fb-name">${esc(fb.username)}</div>
-            <div class="fb-time">${timeAgo(fb.createdAt)}</div>
+            <div class="fb-time">${timeAgo(fb.created_at || fb.createdAt)}</div>
           </div>
           <span class="fb-category ${fb.category}">${fb.category}</span>
         </div>
@@ -355,22 +355,34 @@ async function submitFeedback() {
   if (!content) { alert("请输入反馈内容"); return; }
   const btn = document.querySelector(".btn-submit");
   btn.disabled = true; btn.textContent = "提交中...";
-  try {
-    const resp = await fetch("/api/feedback", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({username:name||"匿名用户",content,category}) });
-    const text = await resp.text();
-    let data;
-    try { data = JSON.parse(text); } catch { throw new Error("服务器返回异常"); }
-    if (data.error) { alert(data.error); btn.disabled = false; btn.textContent = "提交"; return; }
-    document.getElementById("fbContent").value = "";
-    if (name) localStorage.setItem("fb_name", name);
-    // 等 500ms 再刷新（给 Supabase 写入时间）
-    await new Promise(r => setTimeout(r, 500));
-    await loadFeedback();
-    btn.textContent = "✅ 已提交";
-    setTimeout(() => { btn.textContent = "提交"; btn.disabled = false; }, 2000);
-  } catch(e) {
-    btn.disabled = false; btn.textContent = "提交";
-    alert("提交失败: " + e.message);
+
+  // 重试机制（最多3次）
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const resp = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: name || "匿名用户", content, category }),
+      });
+      const data = await resp.json();
+      if (data.error) {
+        if (attempt < 3) { await new Promise(r => setTimeout(r, 1000)); continue; }
+        alert("提交失败: " + data.error);
+        btn.disabled = false; btn.textContent = "提交";
+        return;
+      }
+      document.getElementById("fbContent").value = "";
+      if (name) localStorage.setItem("fb_name", name);
+      await new Promise(r => setTimeout(r, 800));
+      await loadFeedback();
+      btn.textContent = "✅ 已提交";
+      setTimeout(() => { btn.textContent = "提交"; btn.disabled = false; }, 2000);
+      return;
+    } catch (e) {
+      if (attempt < 3) { await new Promise(r => setTimeout(r, 1000)); continue; }
+      btn.disabled = false; btn.textContent = "提交";
+      alert("提交失败，请重试: " + e.message);
+    }
   }
 }
 
@@ -387,7 +399,9 @@ async function submitReply(fbId) {
 }
 
 function timeAgo(iso) {
+  if (!iso) return "刚刚";
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (isNaN(diff)) return "刚刚";
   if (diff < 60) return "刚刚";
   if (diff < 3600) return Math.floor(diff/60) + "分钟前";
   if (diff < 86400) return Math.floor(diff/3600) + "小时前";
