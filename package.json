@@ -10,7 +10,6 @@
     "cli": "node src/index.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.0",
     "express": "^4.22.2",
