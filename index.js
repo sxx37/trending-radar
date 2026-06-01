@@ -92,6 +92,18 @@ app.post("/api/feedback/like", async (req, res) => {
   res.json(result);
 });
 
+// ═══ 调试端点 ═══
+app.get("/api/debug", async (req, res) => {
+  const urlOk = !!process.env.SUPABASE_URL;
+  const keyOk = !!process.env.SUPABASE_KEY;
+  const urlVal = (process.env.SUPABASE_URL || "").slice(0, 30);
+  res.json({
+    supabase_url: urlOk ? urlVal + "..." : "MISSING",
+    supabase_key: keyOk ? "SET" : "MISSING",
+    env_all: Object.keys(process.env).filter(k => k.startsWith("SUPA") || k.startsWith("AI_")),
+  });
+});
+
 // ═══ 健康检查 ═══
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 
