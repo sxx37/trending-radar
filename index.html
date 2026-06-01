@@ -186,7 +186,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei
         <button class="btn-submit" onclick="submitFeedback()">提交</button>
       </div>
     </div>
-    <div id="debugInfo" style="background:#fff3cd;border-radius:8px;padding:8px 12px;font-size:.78em;color:#856404;margin-bottom:12px;min-height:20px"></div>
+    <div id="debugInfo" style="background:#fff3cd;border-radius:8px;padding:8px 12px;font-size:.78em;color:#856404;margin-bottom:12px;min-height:20px;word-break:break-all"></div>
     <div class="feedback-list" id="feedbackList"></div>
   </div>
 </div>
@@ -282,11 +282,15 @@ async function loadFeedback() {
       const db = document.getElementById("debugInfo");
       if (db) db.textContent = "Supabase: " + (data.debug.supabaseUrl || "未知") + (data.debug.error ? " | 错误: " + data.debug.error : "");
     }
-    // 调试：显示第一条数据的所有字段
-    if (data.feedback && data.feedback.length > 0) {
-      const db = document.getElementById("debugInfo");
-      const f = data.feedback[0];
-      if (db) db.textContent = "字段: " + Object.keys(f).join(", ") + " | time值: " + (f.created_at || f.createdAt || "无");
+    // 调试：直接显示原始数据
+    const db = document.getElementById("debugInfo");
+    if (db) {
+      if (data.feedback && data.feedback.length > 0) {
+        const f = data.feedback[0];
+        db.textContent = "字段:" + Object.keys(f).join(",") + " | time:" + JSON.stringify(f.created_at) + " | 原始:" + JSON.stringify(f).slice(0, 200);
+      } else {
+        db.textContent = "无数据 | raw:" + JSON.stringify(data).slice(0, 200);
+      }
     }
     renderFeedback(data.feedback || []);
   } catch (e) {
@@ -405,9 +409,17 @@ async function submitReply(fbId) {
 }
 
 function timeAgo(val) {
-  if (!val) return "刚刚";
+  // 从各种可能的字段名中取时间
+  let raw = val;
+  if (!raw && arguments.length > 0) raw = null;
+  if (!raw) return "刚刚";
+  // 如果传入的是对象，尝试找时间字段
+  if (typeof raw === "object" && raw !== null) {
+    raw = raw.created_at || raw.createdAt || raw.created || raw.time || raw.date || null;
+  }
+  if (!raw) return "刚刚";
   let ts;
-  try { ts = new Date(val).getTime(); } catch { return "刚刚"; }
+  try { ts = new Date(String(raw)).getTime(); } catch { return "刚刚"; }
   if (!ts || isNaN(ts)) return "刚刚";
   const diff = (Date.now() - ts) / 1000;
   if (diff < 0 || isNaN(diff)) return "刚刚";
