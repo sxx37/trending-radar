@@ -275,23 +275,8 @@ async function startFetch() {
 // ═══ 反馈系统 ═══
 async function loadFeedback() {
   try {
-    const resp = await fetch("/api/feedback");
+    const resp = await fetch("/api/feedback?_t=" + Date.now());
     const data = await resp.json();
-    // 调试：显示在页面上
-    if (data.debug) {
-      const db = document.getElementById("debugInfo");
-      if (db) db.textContent = "Supabase: " + (data.debug.supabaseUrl || "未知") + (data.debug.error ? " | 错误: " + data.debug.error : "");
-    }
-    // 调试：直接显示原始数据
-    const db = document.getElementById("debugInfo");
-    if (db) {
-      if (data.feedback && data.feedback.length > 0) {
-        const f = data.feedback[0];
-        db.textContent = "字段:" + Object.keys(f).join(",") + " | time:" + JSON.stringify(f.created_at) + " | 原始:" + JSON.stringify(f).slice(0, 200);
-      } else {
-        db.textContent = "无数据 | raw:" + JSON.stringify(data).slice(0, 200);
-      }
-    }
     renderFeedback(data.feedback || []);
   } catch (e) {
     console.error("加载反馈失败:", e);
@@ -437,7 +422,18 @@ function formatHeat(n) {
   return String(n);
 }
 
-window.onload = () => { const n = localStorage.getItem("fb_name"); if (n) document.getElementById("fbName").value = n; loadFeedback(); };
+window.onload = () => {
+  const n = localStorage.getItem("fb_name");
+  if (n) document.getElementById("fbName").value = n;
+  // 测试 timeAgo 是否正常
+  const testDiv = document.getElementById("debugInfo");
+  if (testDiv) {
+    const t1 = timeAgo("2026-06-01T09:01:55.077146+00:00");
+    const t2 = timeAgo(new Date().toISOString());
+    testDiv.textContent = "timeAgo测试: ISO=" + t1 + " | 现在=" + t2;
+  }
+  loadFeedback();
+};
 </script>
 </body>
 </html>
