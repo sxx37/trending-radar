@@ -1,0 +1,17 @@
+{
+  "name": "trending-radar",
+  "version": "1.0.0",
+  "description": "热梗雷达 - 多平台热搜/热榜聚合工具",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "no-ai": "node src/index.js --no-ai"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.0",
+    "express": "^4.22.2",
+    "openai": "^4.70.0"
+  }
+}
