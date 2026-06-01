@@ -186,6 +186,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei
         <button class="btn-submit" onclick="submitFeedback()">提交</button>
       </div>
     </div>
+    <div id="debugInfo" style="background:#fff3cd;border-radius:8px;padding:8px 12px;font-size:.78em;color:#856404;margin-bottom:12px;min-height:20px"></div>
     <div class="feedback-list" id="feedbackList"></div>
   </div>
 </div>
@@ -276,8 +277,15 @@ async function loadFeedback() {
   try {
     const resp = await fetch("/api/feedback");
     const data = await resp.json();
+    // 调试：显示在页面上
+    if (data.debug) {
+      const db = document.getElementById("debugInfo");
+      if (db) db.textContent = "Supabase: " + (data.debug.supabaseUrl || "未知") + (data.debug.error ? " | 错误: " + data.debug.error : "");
+    }
     renderFeedback(data.feedback || []);
-  } catch {}
+  } catch (e) {
+    console.error("加载反馈失败:", e);
+  }
 }
 
 function renderFeedback(items) {
@@ -345,14 +353,37 @@ async function submitFeedback() {
   const content = document.getElementById("fbContent").value.trim();
   const category = document.getElementById("fbCategory").value;
   if (!content) { alert("请输入反馈内容"); return; }
-  try {
-    const resp = await fetch("/api/feedback", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({username:name||"匿名用户",content,category}) });
-    const data = await resp.json();
-    if (data.error) { alert(data.error); return; }
-    document.getElementById("fbContent").value = "";
-    if (name) localStorage.setItem("fb_name", name);
-    loadFeedback();
-  } catch(e) { alert("提交失败: " + e.message); }
+  const btn = document.querySelector(".btn-submit");
+  btn.disabled = true; btn.textContent = "提交中...";
+
+  // 重试机制（最多3次）
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const resp = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: name || "匿名用户", content, category }),
+      });
+      const data = await resp.json();
+      if (data.error) {
+        if (attempt < 3) { await new Promise(r => setTimeout(r, 1000)); continue; }
+        alert("提交失败: " + data.error);
+        btn.disabled = false; btn.textContent = "提交";
+        return;
+      }
+      document.getElementById("fbContent").value = "";
+      if (name) localStorage.setItem("fb_name", name);
+      await new Promise(r => setTimeout(r, 800));
+      await loadFeedback();
+      btn.textContent = "✅ 已提交";
+      setTimeout(() => { btn.textContent = "提交"; btn.disabled = false; }, 2000);
+      return;
+    } catch (e) {
+      if (attempt < 3) { await new Promise(r => setTimeout(r, 1000)); continue; }
+      btn.disabled = false; btn.textContent = "提交";
+      alert("提交失败，请重试: " + e.message);
+    }
+  }
 }
 
 async function submitReply(fbId) {

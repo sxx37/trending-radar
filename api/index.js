@@ -11,6 +11,7 @@ import { getAllFeedback, addFeedback, replyFeedback, toggleLike } from "../src/f
 const app = express();
 app.use(express.json());
 
+// CORS
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -19,21 +20,26 @@ app.use((req, res, next) => {
   next();
 });
 
+// ═══ 抓取 API ═══
 app.post("/api/run", async (req, res) => {
   const t0 = Date.now();
   try {
     const { results: rawData } = await fetchAll();
     const total = Object.values(rawData).reduce((s, v) => s + v.length, 0);
     if (total === 0) return res.json({ error: "所有平台均获取失败" });
+
     let mergedData = [];
     try { mergedData = mergeAcrossPlatforms(rawData); } catch {}
+
     let aggregatedData = [];
     try { aggregatedData = await fetchAggregatedTrends(); } catch {}
+
     let summary = null;
     if (config.ai.apiKey) {
       try { summary = await summarize(rawData, mergedData, aggregatedData); } catch {}
     }
     if (!summary) summary = buildBasicReport(rawData, mergedData);
+
     const allRaw = [];
     for (const [src, items] of Object.entries(rawData)) {
       for (const it of items) {
@@ -48,6 +54,7 @@ app.post("/api/run", async (req, res) => {
       for (const m of matched) if (m.heat && !hm[m.src]) hm[m.src] = m.heat;
       t.heat_values = hm;
     }
+
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
     res.json({
       success: true, elapsed: elapsed + "s", date: summary?.date,
@@ -60,14 +67,23 @@ app.post("/api/run", async (req, res) => {
   }
 });
 
+// ═══ 反馈 API（Supabase 云端存储）═══
 app.get("/api/feedback", async (req, res) => {
   const result = await getAllFeedback();
-  res.json({ feedback: result.items || [], debug: { supabaseUrl: process.env.SUPABASE_URL ? "✅" : "❌", error: result.error || null } });
+  res.json({
+    feedback: result.items || [],
+    debug: { supabaseUrl: process.env.SUPABASE_URL ? "✅" : "❌", error: result.error || null },
+  });
 });
 
 app.post("/api/feedback", async (req, res) => {
-  const result = await addFeedback(req.body);
-  res.json({ ...result, debug: { supabaseUrl: process.env.SUPABASE_URL ? "✅" : "❌" } });
+  try {
+    const result = await addFeedback(req.body);
+    res.json(result);
+  } catch (e) {
+    console.error("[API] feedback POST error:", e.message);
+    res.json({ error: "服务器错误: " + e.message });
+  }
 });
 
 app.post("/api/feedback/reply", async (req, res) => {
@@ -81,24 +97,10 @@ app.post("/api/feedback/like", async (req, res) => {
   res.json(result);
 });
 
-app.get("/api/debug", async (req, res) => {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_KEY;
-  const debug = { url: url ? "✅" : "❌", key: key ? "✅" : "❌" };
-  if (url && key) {
-    try {
-      const resp = await fetch(`${url}/rest/v1/feedback?select=*&limit=5`, {
-        headers: { "apikey": key, "Authorization": `Bearer ${key}` },
-      });
-      debug.httpStatus = resp.status;
-      const data = await resp.json();
-      debug.data = data;
-      debug.dataCount = Array.isArray(data) ? data.length : 0;
-    } catch (e) { debug.fetchError = e.message; }
-  }
-  res.json(debug);
-});
+// ═══ 调试端点 ═══
+app.get("/api/debug", (req, res) => res.json({ status: "ok" }));
 
+// ═══ 健康检查 ═══
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 
 function titleMatch(a, b) {
