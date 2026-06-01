@@ -1,28 +1,25 @@
 /**
  * 反馈系统 - Supabase 云端存储
- * 替代 JSON 文件存储，支持 Vercel 部署
  */
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL || "",
-  process.env.SUPABASE_KEY || ""
-);
+const url = process.env.SUPABASE_URL || "";
+const key = process.env.SUPABASE_KEY || "";
+const supabase = createClient(url, key);
 
 /**
- * 获取所有反馈（按点赞数倒序）
+ * 获取所有反馈
  */
 export async function getAllFeedback() {
-  console.log("[FB] SUPABASE_URL:", process.env.SUPABASE_URL ? "已配置" : "未配置");
-  console.log("[FB] SUPABASE_KEY:", process.env.SUPABASE_KEY ? "已配置" : "未配置");
-  const { data, error } = await supabase
-    .from("feedback")
-    .select("*")
-    .order("likes", { ascending: false })
-    .order("created_at", { ascending: false });
-  if (error) { console.error("[FB] 获取反馈失败:", error.message, error.code); return []; }
-  console.log("[FB] 查询结果:", data?.length, "条");
-  return data || [];
+  // 先试简单查询，不带 order
+  const { data, error } = await supabase.from("feedback").select("*");
+  if (error) {
+    console.error("[FB] 查询失败:", error.message, error.code, error.details);
+    return { items: [], error: error.message };
+  }
+  // 手动排序
+  const sorted = (data || []).sort((a, b) => (b.likes || 0) - (a.likes || 0));
+  return { items: sorted, error: null };
 }
 
 /**
@@ -40,8 +37,10 @@ export async function addFeedback({ username, content, category }) {
     liked_by: [],
     replies: [],
   }).select().single();
-  if (error) { console.error("[FB] 提交反馈失败:", error.message, error.code, error.details); return { error: error.message }; }
-  console.log("[FB] 提交成功:", data?.id);
+  if (error) {
+    console.error("[FB] 写入失败:", error.message, error.code, error.details);
+    return { error: error.message };
+  }
   return { success: true, feedback: data };
 }
 
@@ -50,7 +49,6 @@ export async function addFeedback({ username, content, category }) {
  */
 export async function replyFeedback({ id, username, content }) {
   if (!id || !content?.trim()) return { error: "回复内容不能为空" };
-  // 先获取当前反馈
   const { data: fb } = await supabase.from("feedback").select("replies").eq("id", id).single();
   if (!fb) return { error: "反馈不存在" };
   const reply = {

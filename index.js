@@ -69,21 +69,16 @@ app.post("/api/run", async (req, res) => {
 
 // ═══ 反馈 API（Supabase 云端存储）═══
 app.get("/api/feedback", async (req, res) => {
-  const debug = {
-    url: process.env.SUPABASE_URL ? "已配置" : "未配置",
-    key: process.env.SUPABASE_KEY ? "已配置" : "未配置",
-  };
-  const feedback = await getAllFeedback();
-  res.json({ feedback, debug });
+  const result = await getAllFeedback();
+  res.json({
+    feedback: result.items || [],
+    debug: { supabaseUrl: process.env.SUPABASE_URL ? "✅" : "❌", error: result.error || null },
+  });
 });
 
 app.post("/api/feedback", async (req, res) => {
-  const debug = {
-    url: process.env.SUPABASE_URL ? "已配置" : "未配置",
-    key: process.env.SUPABASE_KEY ? "已配置" : "未配置",
-  };
   const result = await addFeedback(req.body);
-  res.json({ ...result, debug });
+  res.json({ ...result, debug: { supabaseUrl: process.env.SUPABASE_URL ? "✅" : "❌" } });
 });
 
 app.post("/api/feedback/reply", async (req, res) => {

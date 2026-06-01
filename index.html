@@ -186,6 +186,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei
         <button class="btn-submit" onclick="submitFeedback()">提交</button>
       </div>
     </div>
+    <div id="debugInfo" style="background:#fff3cd;border-radius:8px;padding:8px 12px;font-size:.78em;color:#856404;margin-bottom:12px;min-height:20px"></div>
     <div class="feedback-list" id="feedbackList"></div>
   </div>
 </div>
@@ -276,8 +277,15 @@ async function loadFeedback() {
   try {
     const resp = await fetch("/api/feedback");
     const data = await resp.json();
+    // 调试：显示在页面上
+    if (data.debug) {
+      const db = document.getElementById("debugInfo");
+      if (db) db.textContent = "Supabase: " + (data.debug.supabaseUrl || "未知") + (data.debug.error ? " | 错误: " + data.debug.error : "");
+    }
     renderFeedback(data.feedback || []);
-  } catch {}
+  } catch (e) {
+    console.error("加载反馈失败:", e);
+  }
 }
 
 function renderFeedback(items) {
