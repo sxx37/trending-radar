@@ -186,7 +186,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei
         <button class="btn-submit" onclick="submitFeedback()">提交</button>
       </div>
     </div>
-    <div id="debugInfo" style="background:#fff3cd;border-radius:8px;padding:8px 12px;font-size:.78em;color:#856404;margin-bottom:12px;min-height:20px;word-break:break-all"></div>
     <div class="feedback-list" id="feedbackList"></div>
   </div>
 </div>
@@ -422,18 +421,7 @@ function formatHeat(n) {
   return String(n);
 }
 
-window.onload = () => {
-  const n = localStorage.getItem("fb_name");
-  if (n) document.getElementById("fbName").value = n;
-  // 测试 timeAgo 是否正常
-  const testDiv = document.getElementById("debugInfo");
-  if (testDiv) {
-    const t1 = timeAgo("2026-06-01T09:01:55.077146+00:00");
-    const t2 = timeAgo(new Date().toISOString());
-    testDiv.textContent = "timeAgo测试: ISO=" + t1 + " | 现在=" + t2;
-  }
-  loadFeedback();
-};
+window.onload = () => { const n = localStorage.getItem("fb_name"); if (n) document.getElementById("fbName").value = n; loadFeedback(); };
 </script>
 </body>
 </html>
