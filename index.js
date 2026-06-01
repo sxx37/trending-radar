@@ -94,14 +94,28 @@ app.post("/api/feedback/like", async (req, res) => {
 
 // ═══ 调试端点 ═══
 app.get("/api/debug", async (req, res) => {
-  const urlOk = !!process.env.SUPABASE_URL;
-  const keyOk = !!process.env.SUPABASE_KEY;
-  const urlVal = (process.env.SUPABASE_URL || "").slice(0, 30);
-  res.json({
-    supabase_url: urlOk ? urlVal + "..." : "MISSING",
-    supabase_key: keyOk ? "SET" : "MISSING",
-    env_all: Object.keys(process.env).filter(k => k.startsWith("SUPA") || k.startsWith("AI_")),
-  });
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_KEY;
+  const debug = { url: url ? "✅" : "❌", key: key ? "✅" : "❌", envs: Object.keys(process.env).filter(k => k.startsWith("SUPA")) };
+
+  // 绕过 SDK，直接用 REST API 查
+  if (url && key) {
+    try {
+      const resp = await fetch(`${url}/rest/v1/feedback?select=*&limit=5`, {
+        headers: {
+          "apikey": key,
+          "Authorization": `Bearer ${key}`,
+        },
+      });
+      debug.httpStatus = resp.status;
+      const data = await resp.json();
+      debug.data = data;
+      debug.dataCount = Array.isArray(data) ? data.length : 0;
+    } catch (e) {
+      debug.fetchError = e.message;
+    }
+  }
+  res.json(debug);
 });
 
 // ═══ 健康检查 ═══
