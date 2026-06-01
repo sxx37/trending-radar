@@ -282,6 +282,11 @@ async function loadFeedback() {
       const db = document.getElementById("debugInfo");
       if (db) db.textContent = "Supabase: " + (data.debug.supabaseUrl || "未知") + (data.debug.error ? " | 错误: " + data.debug.error : "");
     }
+    // 打印第一条数据的字段名，方便排查
+    if (data.feedback && data.feedback.length > 0) {
+      console.log("反馈字段:", Object.keys(data.feedback[0]));
+      console.log("created_at:", data.feedback[0].created_at, "createdAt:", data.feedback[0].createdAt);
+    }
     renderFeedback(data.feedback || []);
   } catch (e) {
     console.error("加载反馈失败:", e);
