@@ -6,6 +6,7 @@ import { config } from "../src/config.js";
 import { fetchAll, mergeAcrossPlatforms } from "../src/scrapers.js";
 import { fetchAggregatedTrends } from "../src/aggregation.js";
 import { summarize, buildBasicReport } from "../src/summarizer.js";
+import { getAllFeedback, addFeedback, replyFeedback, toggleLike } from "../src/feedback-supabase.js";
 
 const app = express();
 app.use(express.json());
@@ -66,11 +67,42 @@ app.post("/api/run", async (req, res) => {
   }
 });
 
-// ═══ 反馈 API（Vercel 无持久化，返回空）═══
-app.get("/api/feedback", (req, res) => res.json({ feedback: [] }));
-app.post("/api/feedback", (req, res) => res.json({ success: true }));
-app.post("/api/feedback/reply", (req, res) => res.json({ success: true }));
-app.post("/api/feedback/like", (req, res) => res.json({ success: true, likes: 0, liked: false }));
+// ═══ 反馈 API（Supabase 云端存储）═══
+app.get("/api/feedback", async (req, res) => {
+  const result = await getAllFeedback();
+  res.json({
+    feedback: result.items || [],
+    debug: { supabaseUrl: process.env.SUPABASE_URL ? "✅" : "❌", error: result.error || null },
+  });
+});
+
+app.post("/api/feedback", async (req, res) => {
+  const result = await addFeedback(req.body);
+  res.json({ ...result, debug: { supabaseUrl: process.env.SUPABASE_URL ? "✅" : "❌" } });
+});
+
+app.post("/api/feedback/reply", async (req, res) => {
+  const result = await replyFeedback(req.body);
+  res.json(result);
+});
+
+app.post("/api/feedback/like", async (req, res) => {
+  const fp = req.body.fingerprint || req.ip;
+  const result = await toggleLike({ id: req.body.id, fingerprint: fp });
+  res.json(result);
+});
+
+// ═══ 调试端点 ═══
+app.get("/api/debug", async (req, res) => {
+  const urlOk = !!process.env.SUPABASE_URL;
+  const keyOk = !!process.env.SUPABASE_KEY;
+  const urlVal = (process.env.SUPABASE_URL || "").slice(0, 30);
+  res.json({
+    supabase_url: urlOk ? urlVal + "..." : "MISSING",
+    supabase_key: keyOk ? "SET" : "MISSING",
+    env_all: Object.keys(process.env).filter(k => k.startsWith("SUPA") || k.startsWith("AI_")),
+  });
+});
 
 // ═══ 健康检查 ═══
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
